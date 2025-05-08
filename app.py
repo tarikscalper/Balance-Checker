@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, Response, jsonify
+from flask import Flask, render_template, request, Response, redirect, url_for, jsonify
 from web3 import Web3
 from eth_account import Account
 from networks import NETWORKS
 import threading
 import webbrowser
 import time
+import ast
+import json
 
 app = Flask(__name__)
 
@@ -118,14 +120,53 @@ def stream_route():
 
                     yield f"data: ✅ {address} | {network} | {token_label}: {value_str}\n\n"
                     time.sleep(0.3)
-
         except Exception as e:
             yield f"data: ❌ Помилка: {str(e)}\n\n"
             return
 
-        yield f"data: ---\n🧮 Сума: {total:.6f}\n\n"
-
     return Response(generate(), mimetype='text/event-stream')
+
+@app.route("/add-token", methods=["GET", "POST"])
+def add_token():
+    if request.method == "GET":
+        return render_template("add_token.html", networks=NETWORKS.keys())
+
+    network = request.form["network"]
+    name = request.form["name"].strip().upper()
+    address = request.form["address"].strip()
+    decimals = 18  # за замовчуванням
+
+    if not network or not name or not address:
+        return redirect(url_for("index"))
+
+    file_path = "networks.py"
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        code = f.read()
+
+    parsed = ast.parse(code)
+    assign = next((node for node in parsed.body if isinstance(node, ast.Assign) and node.targets[0].id == "NETWORKS"), None)
+
+    if not assign:
+        return redirect(url_for("index"))
+
+    networks_dict = ast.literal_eval(assign.value)
+
+    # перевірка на дублікат контракту
+    if any(t["address"].lower() == address.lower() for t in networks_dict.get(network, {}).get("tokens", [])):
+        return redirect(url_for("index"))
+
+    networks_dict.setdefault(network, {}).setdefault("tokens", []).append({
+        "name": name,
+        "address": address,
+        "decimals": decimals
+    })
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write("NETWORKS = ")
+        json.dump(networks_dict, f, indent=4, ensure_ascii=False)
+
+    return redirect(url_for("index"))
 
 @app.after_request
 def add_headers(response):

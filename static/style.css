@@ -43,6 +43,27 @@ button {
   margin-top: 20px;
 }
 
+.stop-btn {
+  background-color: #ff4d4f;
+  color: white;
+}
+
+#download-btn {
+  background: #4caf50;
+  color: white;
+  font-weight: bold;
+  display: none;
+}
+
+a.add-token-link {
+  display: block;
+  text-align: center;
+  margin-top: 20px;
+  color: #00ffc3;
+  font-weight: bold;
+  text-decoration: none;
+}
+
 .log-box {
   margin-top: 25px;
   background: #111;
@@ -54,7 +75,20 @@ button {
   white-space: pre-wrap;
 }
 
+.status {
+  margin-top: 20px;
+  background: #111;
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-family: monospace;
+}
+
 .error {
   color: red;
+  font-weight: bold;
+}
+
+.success {
+  color: #7fff7f;
   font-weight: bold;
 }

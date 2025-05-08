@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Додати токен</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0e0e0e;
+      color: #f1f1f1;
+      padding: 30px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: #1e1e1e;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #222;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #00ffcc;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      background: #2e2e2e;
+      border: none;
+      color: #fff;
+      border-radius: 5px;
+    }
+
+    button {
+      margin-top: 25px;
+      width: 100%;
+      background-color: #00ffcc;
+      color: #000;
+      font-weight: bold;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    a.back-link {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      color: #00ffc3;
+      text-decoration: none;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>➕ Додати новий токен</h1>
+
+    <form method="POST" action="/add-token">
+      <label for="network">Мережа:</label>
+      <select name="network" id="network" required>
+        {% for name in networks %}
+          <option value="{{ name }}">{{ name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="name">Назва токена:</label>
+      <input type="text" name="name" id="name" placeholder="Наприклад: USDT" required>
+
+      <label for="address">Контракт токена:</label>
+      <input type="text" name="address" id="address" placeholder="0x..." required>
+
+      <button type="submit">💾 Зберегти токен</button>
+    </form>
+
+    <a href="/" class="back-link">← Назад до головної</a>
+  </div>
+</body>
+</html>
