@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Token Checker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .stop-btn {
+      background-color: #ff4d4f;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 6px;
+      display: none;
+    }
+    #download-btn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      font-weight: bold;
+      border-radius: 6px;
+      border: none;
+      background: #4caf50;
+      color: white;
+      cursor: pointer;
+      display: none;
+    }
+    .status {
+      margin-top: 20px;
+      background: #111;
+      padding: 10px 15px;
+      border-radius: 6px;
+      font-family: monospace;
+    }
+    .success {
+      color: #7fff7f;
+      font-weight: bold;
+    }
+    .error {
+      color: #ff4d4f;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🪙 Token Checker</h1>
+
+    <form id="check-form">
+      <label for="network-select">Мережа:</label>
+      <select name="network" id="network-select" required>
+        {% for name, net in networks.items() %}
+          <option value="{{ name }}">{{ name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="token-select">Токен:</label>
+      <select name="token" id="token-select" required></select>
+
+      <div class="btn-group">
+        <button type="submit">🔍 Перевірити баланси</button>
+        <button type="button" id="stop-btn" class="stop-btn">⛔ Зупинити</button>
+      </div>
+    </form>
+
+    <button id="download-btn">⬇️ Завантажити баланс (CSV)</button>
+
+    <div class="status" id="status-box" style="display: none;">
+      ⏱ Час: <span id="timer">00:00</span> |
+      ✅ Перевірено: <span id="progress">0</span>/<span id="total">?</span> |
+      🧮 Сума: <span id="sum">0.000000</span>
+    </div>
+
+    <div id="logs" class="log-box"></div>
+  </div>
+
+  <script>
+    const networkSelect = document.getElementById('network-select');
+    const tokenSelect = document.getElementById('token-select');
+    const form = document.getElementById('check-form');
+    const logsBox = document.getElementById('logs');
+    const stopBtn = document.getElementById('stop-btn');
+    const timerEl = document.getElementById('timer');
+    const progressEl = document.getElementById('progress');
+    const totalEl = document.getElementById('total');
+    const sumEl = document.getElementById('sum');
+    const statusBox = document.getElementById('status-box');
+    const downloadBtn = document.getElementById('download-btn');
+
+    let eventSource = null;
+    let timerInterval = null;
+    let seconds = 0;
+    let total = 0;
+    let count = 0;
+    let finished = false;
+
+    function formatTime(s) {
+      const min = String(Math.floor(s / 60)).padStart(2, '0');
+      const sec = String(s % 60).padStart(2, '0');
+      return `${min}:${sec}`;
+    }
+
+    function loadTokens(network) {
+      fetch(`/tokens?network=${network}`)
+        .then(res => res.json())
+        .then(tokens => {
+          tokenSelect.innerHTML = '';
+          tokens.forEach(token => {
+            const opt = document.createElement('option');
+            opt.value = token;
+            opt.textContent = token;
+            tokenSelect.appendChild(opt);
+          });
+        });
+    }
+
+    loadTokens(networkSelect.value);
+    networkSelect.addEventListener('change', () => {
+      loadTokens(networkSelect.value);
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      logsBox.innerHTML = "<div>🚀 Перевірка запущена...</div>";
+      statusBox.style.display = "block";
+      stopBtn.style.display = "inline-block";
+      downloadBtn.style.display = "none";
+      finished = false;
+
+      const network = networkSelect.value;
+      const token = tokenSelect.value;
+      count = 0;
+      seconds = 0;
+      progressEl.textContent = "0";
+      sumEl.textContent = "0.000000";
+
+      const res = await fetch('/wallets-count');
+      const data = await res.json();
+      total = data.count;
+      totalEl.textContent = total;
+
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        seconds++;
+        timerEl.textContent = formatTime(seconds);
+      }, 1000);
+
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource(`/stream?network=${network}&token=${token}`);
+
+      eventSource.onmessage = (event) => {
+        logsBox.innerHTML += `<div>${event.data}</div>`;
+        logsBox.scrollTop = logsBox.scrollHeight;
+
+        if (event.data.startsWith("✅")) {
+          count++;
+          progressEl.textContent = count;
+
+          const match = event.data.match(/:\s([\d.]+)/);
+          if (match) {
+            const value = parseFloat(match[1]);
+            if (!isNaN(value)) {
+              const current = parseFloat(sumEl.textContent);
+              const totalSum = current + value;
+              sumEl.textContent = totalSum.toFixed(6);
+            }
+          }
+
+          if (count >= total) {
+            finished = true;
+            clearInterval(timerInterval);
+            if (eventSource) eventSource.close();
+            eventSource = null;
+            stopBtn.style.display = "none";
+            logsBox.innerHTML += `<div class="success">✅ Перевірка завершена. Загальна сума: ${sumEl.textContent}</div>`;
+            downloadBtn.style.display = "inline-block";
+          }
+        }
+      };
+
+      eventSource.onerror = () => {
+        clearInterval(timerInterval);
+        if (!finished) {
+          logsBox.innerHTML += `<div class="error">❌ Сталася помилка або з'єднання втрачено.</div>`;
+        }
+        if (eventSource) eventSource.close();
+        eventSource = null;
+        stopBtn.style.display = "none";
+      };
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+        logsBox.innerHTML += `<div class="error">🛑 Перевірку зупинено.</div>`;
+      }
+      clearInterval(timerInterval);
+      stopBtn.style.display = "none";
+    });
+
+    function downloadCSV() {
+      const rows = [["Address", "Network", "Token", "Balance"]];
+      const logLines = Array.from(document.querySelectorAll('#logs div'));
+
+      logLines.forEach(line => {
+        const text = line.textContent.trim();
+        if (text.startsWith("✅")) {
+          try {
+            const parts = text.split('|').map(p => p.trim());
+            const address = parts[0].split(' ')[1];
+            const network = parts[1];
+            const token = parts[2].split(':')[0].trim();
+            const balance = parts[2].split(':')[1].trim();
+            rows.push([address, network, token, balance]);
+          } catch (err) {
+            console.error("Помилка розбору рядка:", text);
+          }
+        }
+      });
+
+      if (rows.length === 1) {
+        alert("Немає даних для експорту.");
+        return;
+      }
+
+      const csvContent = rows.map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "balances.csv";
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    downloadBtn.addEventListener("click", downloadCSV);
+  </script>
+</body>
+</html>
