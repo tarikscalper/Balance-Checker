@@ -7,7 +7,7 @@ NETWORKS = {
                 "name": "USDT",
                 "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
                 "decimals": 6
-            },
+            }
         ]
     },
     "linea": {
@@ -40,7 +40,7 @@ NETWORKS = {
                 "name": "USDT",
                 "address": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
                 "decimals": 6
-            },
+            }
         ]
     },
     "apecoin": {
